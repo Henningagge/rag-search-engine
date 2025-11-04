@@ -1,6 +1,8 @@
 from .search_utils import DEFAULT_SEARCH_LIMIT, load_movies
 import string
-
+from nltk.stem import PorterStemmer
+import os.path
+import pickle
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
     movies = load_movies()
     results = []
@@ -23,6 +25,7 @@ def has_matching_token(query_tokens: list[str], title_tokens: list[str]) -> bool
 
 
 def preprocess_text(text: str) -> str:
+    stemmer = PorterStemmer()
     text = text.lower()
     chars = string.punctuation
     for char in chars:
@@ -33,6 +36,9 @@ def preprocess_text(text: str) -> str:
         if token:
             valid_tokens.append(token)
     valid_tokens = filter_stopwords(valid_tokens)
+
+    for i in range(len(valid_tokens)):
+        valid_tokens[i] = stemmer.stem(valid_tokens[i])
     return valid_tokens
 
 def filter_stopwords(textlist: list[str]) -> list[str]:
@@ -45,3 +51,51 @@ def filter_stopwords(textlist: list[str]) -> list[str]:
             if filword == word:
                 textlist.remove(word)
     return textlist
+
+
+class InvertedIndex():
+    def __init__(self):
+        self.index = {}
+        self.docmap = {}
+
+    def __add_document(self, doc_id, text):
+        token_text = preprocess_text(text)
+        for token in token_text:
+            if token in self.index:
+                token_ids = self.index[token]
+                token_ids.add(doc_id)
+                self.index[token] = token_ids
+            else:
+                self.index[token] = {doc_id}
+    
+    def get_document(self, term):
+        lowerterm = term.lower()
+        doc_ids = []
+        if lowerterm in self.index:
+            for id in self.index[lowerterm]:
+                doc_ids.append(id)
+        else:
+            return []
+        doc_sort =  sorted(doc_ids)
+        return doc_sort
+
+    def build(self):
+        movies = load_movies()
+        count = 0
+        for m in movies:
+            titel_descriptor = f"{m['title']} {m['description']}"
+            self.__add_document(count, titel_descriptor)
+            self.docmap[count] = m
+            count += 1
+
+    def save(self):
+        path = "cache"
+        path_index = "cache/index.pkl"
+        path_doc = "cache/docmap.pkl"
+        os.makedirs(path, exist_ok=True)
+
+        with open(path_index, "wb") as file:
+            pickle.dump(self.index, file)
+        with open(path_doc, "wb") as file:
+            pickle.dump(self.docmap, file)
+        
