@@ -32,4 +32,16 @@ def preprocess_text(text: str) -> str:
     for token in text:
         if token:
             valid_tokens.append(token)
+    valid_tokens = filter_stopwords(valid_tokens)
     return valid_tokens
+
+def filter_stopwords(textlist: list[str]) -> list[str]:
+    path = "/home/heagge/rag-search-engine/data/stopwords.txt"
+    file =  open(path)
+    file = file.read()
+    file_arr = file.splitlines()
+    for word in textlist:
+        for filword in file_arr:
+            if filword == word:
+                textlist.remove(word)
+    return textlist
